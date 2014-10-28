@@ -215,6 +215,7 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
     private boolean useSmResumption = useSmResumptionDefault;
     private long serverHandledStanzasCount = 0;
     private long clientHandledStanzasCount = 0;
+    private Object clientHandledStanzasCountSynchronizationObject = new Object();
     private BlockingQueue<Packet> unacknowledgedStanzas;
 
     /**
@@ -1033,7 +1034,9 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
                                 }
                                 continue;
                             } finally {
-                                clientHandledStanzasCount = SMUtils.incrementHeight(clientHandledStanzasCount);
+                                synchronized (clientHandledStanzasCountSynchronizationObject) {
+                                    clientHandledStanzasCount = SMUtils.incrementHeight(clientHandledStanzasCount);
+                                }
                                 reportStanzaReceived();
                             }
                             processPacket(packet);
@@ -1190,7 +1193,7 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
                         case AckRequest.ELEMENT:
                             // AckRequest stanzas are trival, no need to parse them
                             if (smEnabledSyncPoint.wasSuccessful()) {
-                                packetWriter.sendStreamElement(new AckAnswer(clientHandledStanzasCount));
+                                sendAcknowledgement();
                             } else {
                                 LOGGER.warning("SM Ack Request received while SM is not enabled");
                             }
@@ -1478,6 +1481,15 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
 
     private void requestSmAcknowledgementInternal() throws NotConnectedException {
         packetWriter.sendStreamElement(AckRequest.INSTANCE);
+    }
+    
+    public void sendAcknowledgement() throws NotConnectedException {
+        long currentClientHandledStanzasCount = 0;
+        synchronized (clientHandledStanzasCountSynchronizationObject) {
+            currentClientHandledStanzasCount = clientHandledStanzasCount;
+        }
+        
+        packetWriter.sendStreamElement(new AckAnswer(currentClientHandledStanzasCount));
     }
 
     public void addStanzaAcknowledgedListener(PacketListener listener) {
