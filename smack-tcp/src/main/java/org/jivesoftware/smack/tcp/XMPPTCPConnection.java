@@ -401,11 +401,10 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
 
         bindResourceAndEstablishSession(resource);
 
-        List<Packet> previouslyUnackedStanzas = new LinkedList<Packet>();
         if (unacknowledgedStanzas != null) {
             // There was a previous connection with SM enabled but that was either not resumable or
-            // failed to resume. Make sure that we (re-)send the unacknowledged stanzas.
-            unacknowledgedStanzas.drainTo(previouslyUnackedStanzas);
+            // failed to resume. Clean them.
+            unacknowledgedStanzas.clear();
         }
         if (isSmAvailable() && useSm) {
             // Remove what is maybe left from previously stream managed sessions
@@ -423,10 +422,6 @@ public class XMPPTCPConnection extends AbstractXMPPConnection {
                     requestAckPredicates.add(Predicate.forMessagesOrAfter5Stanzas());
                 }
             }
-        }
-        // (Re-)send the stanzas *after* we tried to enable SM
-        for (Packet stanza : previouslyUnackedStanzas) {
-            sendPacketInternal(stanza);
         }
 
         // Stores the authentication for future reconnection
